@@ -5,7 +5,7 @@ include 'email-files.php';
 if(isset($_GET['code'])) {
     $quizCode = mysqli_real_escape_string($con, $_GET['code']);
     
-    $quizQuery = mysqli_query($con, "SELECT * FROM Quizzes WHERE q_code='$quizCode'");
+    $quizQuery = mysqli_query($con, "SELECT * FROM quizzes WHERE q_code='$quizCode'");
     
     if(mysqli_num_rows($quizQuery) > 0) {
         $quizData = mysqli_fetch_assoc($quizQuery);
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['image_data'])) {
     $relativePath = $filename;                // relative path for DB
     
     if (file_put_contents($filePath, $imageData)) {
-        $updateQuery = "UPDATE Quizzes 
+        $updateQuery = "UPDATE quizzes 
                         SET q_image = '$relativePath', q_result = '$totalPoints' 
                         WHERE q_id = '$quizId'";
         if (mysqli_query($con, $updateQuery)) {
