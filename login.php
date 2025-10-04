@@ -70,7 +70,7 @@
                     $_SESSION['toastr_message'] = "Login Successful! Welcome, " . htmlspecialchars($fetchUser['u_name'], ENT_QUOTES, 'UTF-8') . "!";
                     $_SESSION['toastr_type'] = "success";
 
-                    header("Location: settings.php");
+                    header("Location: index.php");
                     exit();
                 } else {
                     $_SESSION['toastr_message'] = "Invalid Credentials!";

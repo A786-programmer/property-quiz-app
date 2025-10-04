@@ -1,40 +1,50 @@
 <?php
-// quiz_app.php
-// Single-file Quiz system (Phase 1 + Phase 2 merged)
-// - 5 categories x 3 questions = 15
-// - Random shuffle, 5 questions per page
-// - Category-wise scoring and grade-based Chart.js graph preview
-// - Saves results to results/results.csv (server-side), ready for email integration
-// =====================================================
-
-// Handle server-side POST when JS submits results (saves CSV)
-// This endpoint accepts a form field 'payload' (JSON string).
 include 'config.php';
-include 'header-files.php';
-if (isset($_SESSION['qa_user'])) {
+include 'email-files.php';
+
+if(isset($_GET['code'])) {
+    $quizCode = mysqli_real_escape_string($con, $_GET['code']);
     
-    // Get current user details
-    $user_id = $_SESSION['qa_user'];
-    $user_query = mysqli_query($con, "SELECT u_type, u_quiz_submitted FROM users WHERE u_id = '$user_id'");
-    $user_data = mysqli_fetch_assoc($user_query);
-    $user_type = $user_data['u_type'];
-    $quiz_submitted_count = $user_data['u_quiz_submitted'];
+    $quizQuery = mysqli_query($con, "SELECT * FROM Quizzes WHERE q_code='$quizCode'");
     
-    // Check quiz submission limit based on user type
-    function canSubmitQuiz($user_type, $quiz_submitted_count) {
-        if ($user_type == 'basic') {
-            return $quiz_submitted_count < 1; // Basic users can only submit once
-        }
-        return true; // Silver, Gold, Platinum users can submit unlimited times
+    if(mysqli_num_rows($quizQuery) > 0) {
+        $quizData = mysqli_fetch_assoc($quizQuery);
+        $QuizUserId = $quizData['q_user_id'];
+        $quizId = $quizData['q_id']; 
+
+        $_SESSION['quiz_access'] = true;
+        $_SESSION['QuizUserId'] = $QuizUserId;
+        $_SESSION['quiz_code'] = $quizCode;
+        $_SESSION['quiz_id'] = $quizId; 
+        
+        $userQuery = mysqli_query($con, "SELECT u_package_type, u_quiz_created FROM users WHERE u_id = '$QuizUserId'");
+        $userData = mysqli_fetch_assoc($userQuery);
+        $userType = $userData['u_package_type'];
+        $quizSubmittedCount = $userData['u_quiz_created'];
+        
+        $_SESSION['qa_user'] = $QuizUserId;
+        $_SESSION['userType'] = $userType;
+        $_SESSION['quizSubmittedCount'] = $quizSubmittedCount;
+        
+    } else {
+        die("Invalid quiz link! This quiz does not exist.");
     }
-    
-    // Check if user has reached their submission limit
-    if ($user_type == 'basic' && $quiz_submitted_count >= 1) {
-        $_SESSION['toastr_message'] = "Basic package users can only submit 1 quiz. Please upgrade to submit more quizzes.";
-        $_SESSION['toastr_type'] = "warning";
-        header("Location: settings.php");
-        exit();
+} else {
+    die("No quiz code provided! Please use a valid quiz link.");
+}
+
+function canSubmitQuiz($userType, $quizSubmittedCount) {
+    if ($userType == 'basic') {
+        return $quizSubmittedCount < 1;
     }
+    return true;
+}
+
+if ($userType == 'basic' && $quizSubmittedCount >= 1) {
+    echo "<h2>Quiz Submission Limit Reached</h2>";
+    echo "<p>Basic package users can only submit 1 quiz. Please contact the quiz owner to upgrade.</p>";
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payload'])) {
     header('Content-Type: application/json; charset=utf-8');
@@ -45,8 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payload'])) {
         exit;
     }
 
-    // Check quiz submission limit before saving
-    if (!canSubmitQuiz($user_type, $quiz_submitted_count)) {
+    if (!canSubmitQuiz($userType, $quizSubmittedCount)) {
         http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'Quiz submission limit reached for your package']);
         exit;
@@ -64,13 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payload'])) {
         exit;
     }
 
-    // Flatten the payload for CSV (timestamp, name, email, total, category scores as columns)
-    // We expect payload to contain: name, email, time_seconds, submitted_at, totals: {category: points}
     $row = [];
     if ($isNew) {
-        // header
-        $headers = ['submitted_at','name','email','time_seconds','total_points','user_id','user_type'];
-        // add category columns
+        $headers = ['submitted_at','name','email','time_seconds','total_points','user_id','userType'];
         foreach ($payload['totals'] ?? [] as $cat => $v) $headers[] = $cat;
         fputcsv($fp, $headers);
     }
@@ -79,32 +84,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payload'])) {
     $row[] = $payload['email'] ?? '';
     $row[] = $payload['time_seconds'] ?? '';
     $row[] = $payload['total_points'] ?? '';
-    $row[] = $user_id; // Add user ID
-    $row[] = $user_type; // Add user type
+    $row[] = $QuizUserId;
+    $row[] = $userType;
     foreach ($payload['totals'] ?? [] as $cat => $v) $row[] = $v;
     fputcsv($fp, $row);
     fclose($fp);
 
-    // Update quiz submission count in users table
-    $new_count = $quiz_submitted_count + 1;
-    mysqli_query($con, "UPDATE users SET u_quiz_submitted = '$new_count' WHERE u_id = '$user_id'");
+    $new_count = $quizSubmittedCount + 1;
+    mysqli_query($con, "UPDATE users SET u_quiz_created = '$new_count' WHERE u_id = '$QuizUserId'");
 
     echo json_encode(['ok' => true, 'saved_file' => 'results/results.csv', 'submission_count' => $new_count]);
     exit;
 }
 
-if(isset($_POST['quizFrom'])){
-    $_SESSION['name'] = $_POST['name'];
-    $_SESSION['email'] = $_POST['email'];
-    $_SESSION['email1'] = $_POST['email1'];
-    $_SESSION['phone'] = $_POST['phone'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['image_data'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    
+    $imageData = $_POST['image_data'];
+    $totalPoints = $_POST['total_points'] ?? 0;
+    $quizId = $_SESSION['quiz_id'] ?? 0;
+    
+    $imageData = str_replace('data:image/png;base64,', '', $imageData);
+    $imageData = base64_decode($imageData);
+    
+    $imageDir = __DIR__ . '/results';
+    if (!is_dir($imageDir)) {
+        mkdir($imageDir, 0775, true);
+    }
+    
+    $filename = 'quiz_result_' . time() . '.png';
+    $filePath = $imageDir . '/' . $filename;   // absolute path for saving
+    $relativePath = $filename;                // relative path for DB
+    
+    if (file_put_contents($filePath, $imageData)) {
+        $updateQuery = "UPDATE Quizzes 
+                        SET q_image = '$relativePath', q_result = '$totalPoints' 
+                        WHERE q_id = '$quizId'";
+        if (mysqli_query($con, $updateQuery)) {
+            // ✅ Save path in session for later email attachment
+            $_SESSION['quiz_result_image'] = $filePath;
+
+            echo json_encode([
+                'ok' => true,
+                'image_path' => $relativePath
+            ]);
+        } else {
+            echo json_encode([
+                'ok' => false,
+                'error' => 'Database update failed'
+            ]);
+        }
+    } else {
+        echo json_encode([
+            'ok' => false,
+            'error' => 'Image save failed'
+        ]);
+    }
+}
+
+if (isset($_POST['quizFrom'])) {    
+    $_SESSION['name'] = mysqli_real_escape_string($con, $_POST['name']);
+    $_SESSION['email'] = mysqli_real_escape_string($con, $_POST['email']);
+    $_SESSION['phone'] = mysqli_real_escape_string($con, $_POST['phone']);
+
+    $quizId = $_SESSION['quiz_id'];
+
+    mysqli_query($con, "UPDATE quizzes 
+        SET q_name='{$_SESSION['name']}', q_email='{$_SESSION['email']}', q_phone='{$_SESSION['phone']}' 
+        WHERE q_id = '$quizId'");
+
+    try {
+        $mail->clearAddresses();
+        $mail->addAddress($_SESSION['email'], $_SESSION['name']);
+        $mail->isHTML(true);
+        $mail->Subject = $websiteName . " - Quiz Submission Details";
+
+        $bodyContent = "
+            Hello {$_SESSION['name']},<br><br>
+            Thank you for completing the quiz!<br><br>
+            <strong>Your Details:</strong><br>
+            Name: {$_SESSION['name']}<br>
+            Email: {$_SESSION['email']}<br>
+            Phone: {$_SESSION['phone']}<br><br>
+            
+            We have received your quiz submission successfully.<br><br>
+            Please find your quiz result attached below.<br><br>
+        ";
+
+        $mail->Body = $bodyContent;
+
+        // ✅ Get image path from session
+        if (!empty($_SESSION['quiz_result_image']) && file_exists($_SESSION['quiz_result_image'])) {
+            $mail->addAttachment($_SESSION['quiz_result_image'], 'QuizResult.png');
+        } else {
+            error_log("No quiz result image found to attach.");
+        }
+
+        if ($mail->send()) {
+            error_log("Email sent successfully to: " . $_SESSION['email']);
+        } else {
+            error_log("Email sending failed: " . $mail->ErrorInfo);
+        }
+    } catch (Exception $e) {
+        error_log("Mailer Error: " . $e->getMessage());
+    }
 
     header("Location: https://demotestlink.com/form/quiz-complete/");
     exit;
 }
 
-// Otherwise render the single-page app (front-end + all logic)
-?><!doctype html>
+
+?>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -113,6 +204,7 @@ if(isset($_POST['quizFrom'])){
     <title>15-Question Quiz</title>
     <link rel="stylesheet" href="data:,">
     <style>
+        /* Your existing CSS styles remain the same */
         :root{
             --bg:#f6f8fb;
             --card:#fff;
@@ -187,13 +279,13 @@ if(isset($_POST['quizFrom'])){
         .quiz-form button:hover {
             background: #218838;
         }
-        /* Center the dropdown button and dropdown content */
+
         .dropdown {
             position: relative;
             display: inline-block;
             width: 100%;
-            text-align: center; /* Center the content */
-            margin: 0 auto; /* Center the dropdown itself */
+            text-align: center;
+            margin: 0 auto;
         }
 
         .dropbtn {
@@ -212,8 +304,8 @@ if(isset($_POST['quizFrom'])){
             border: 1px solid #ccc;
             min-width: 150px;
             z-index: 9999;
-            left: 50%; /* Center the dropdown content */
-            transform: translateX(-50%); /* Adjust positioning */
+            left: 50%;
+            transform: translateX(-50%);
         }
 
         .dropdown-content div {
@@ -255,15 +347,13 @@ if(isset($_POST['quizFrom'])){
         <div onclick="changeLang('so')"><img src="https://flagcdn.com/w20/so.png"> Somali</div>
     </div>
 </div>
-<!-- Google Translate Widget (hidden) -->
 <div id="google_translate_element" style="display:none;"></div>
 <div class="wrap">
     <div class="card" id="app-card">
-        <!-- Quiz Limit Warning -->
-        <div id="limitWarning" class="limit-warning <?= ($user_type == 'basic' && $quiz_submitted_count >= 1) ? '' : 'hidden' ?>">
+        <div id="limitWarning" class="limit-warning <?= ($userType == 'basic' && $quizSubmittedCount >= 1) ? '' : 'hidden' ?>">
             <strong>⚠️ Quiz Submission Limit Reached</strong><br>
-            Your Basic package allows only 1 quiz submission. You have already submitted <?= $quiz_submitted_count ?> quiz(es). 
-            Please upgrade your package to submit more quizzes.
+            Your Basic package allows only 1 quiz submission. You have already submitted <?= $quizSubmittedCount ?> quiz(es). 
+            Please contact the quiz owner to upgrade.
         </div>
         
         <header>
@@ -271,20 +361,18 @@ if(isset($_POST['quizFrom'])){
                 <h1>15-Question Quiz</h1>
                 <div class="subtitle" id="subtitle">
                     Answer the questions. 5 per page. Questions are randomized.
-                    <?php if($user_type == 'basic'): ?>
-                        <br><span style="color: #dc3545;">Basic Package: <?= (1 - $quiz_submitted_count) ?> submission(s) remaining</span>
+                    <?php if($userType == 'basic'): ?>
+                        <br><span style="color: #dc3545;">Basic Package: <?= (1 - $quizSubmittedCount) ?> submission(s) remaining</span>
                     <?php endif; ?>
                 </div>
             </div>
             <div>
                 <button class="btn-ghost" id="restartBtn">Restart Quiz</button>
-                <a href="settings.php" class="btn btn-login">Dashboard</a>
             </div>
         </header>
 
         <div class="quiz-area" id="quizArea">
             <div class="main card" id="mainCard">
-                <!-- Question pages render here -->
                 <div id="pageInfo" class="muted small" style="margin-bottom:8px">Page <span id="pageNum">1</span> / <span id="pageTotal">3</span></div>
                 <div id="questionsList"></div>
 
@@ -324,7 +412,6 @@ if(isset($_POST['quizFrom'])){
             </aside>
         </div>
 
-        <!-- thank-you and results preview area (hidden until submit) -->
         <div id="thankYouArea" class="hide" style="margin-top:18px;display:none">
             <div class="card thank-card" id="thankCard">
                 <h2>Thank you for completing the quiz!</h2>
@@ -345,22 +432,11 @@ if(isset($_POST['quizFrom'])){
 
     </div>
 </div>
-
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
 <script>
-    // ============================
-    // Front-end JS: quiz + results
-    // ============================
-
-    // User type and submission count from PHP
-    const userType = '<?= $user_type ?>';
-    const quizSubmittedCount = <?= $quiz_submitted_count ?>;
+    const userType = '<?= $userType ?>';
+    const quizSubmittedCount = <?= $quizSubmittedCount ?>;
     const canSubmitMore = userType !== 'basic' || quizSubmittedCount < 1;
-
-    // ========== 1) Raw data extracted from PDF (reduced/cleaned),
-    // We'll keep 5 categories with 3 questions each = 15 total questions
     const RAW_CATEGORIES = [
         {
             name: "Honesty",
@@ -454,35 +530,28 @@ if(isset($_POST['quizFrom'])){
                     ]}
             ]
         }
-    ]; // end RAW_CATEGORIES
+    ];
 
-    // Ensure exactly 5 categories with 3 questions each
     const CATEGORIES = RAW_CATEGORIES.map(cat => {
         const items = [...cat.items];
-        // If we have fewer than 3 questions, duplicate to reach 3
         let i = 0;
         while (items.length < 3) {
             const base = cat.items[i % cat.items.length];
-            // create a shallow clone to avoid reference issues
             const clone = { text: base.text + " ", options: base.options.map(o => ({t:o.t, p:o.p})) };
             items.push(clone);
             i++;
         }
-        // If more than 3 (unlikely), slice
         return { name: cat.name, items: items.slice(0,3) };
     });
 
-    // Flatten 15 questions into array, but keep 'category' property for scoring later.
     const QUESTIONS = [];
     CATEGORIES.forEach(cat => {
         cat.items.forEach(q => {
-            // Ensure options sorted so 2 points appear first
             const opts = q.options.slice().sort((a,b)=> b.p - a.p);
             QUESTIONS.push({ text: q.text, options: opts, category: cat.name });
         });
     });
 
-    // Shuffle at quiz start
     function shuffleArray(a){
         for(let i=a.length-1;i>0;i--){
             const j=Math.floor(Math.random()*(i+1));
@@ -490,9 +559,7 @@ if(isset($_POST['quizFrom'])){
         }
     }
 
-    // only shuffle once when user starts a fresh attempt (or on restart)
     function prepareQuiz(){
-        // We'll create an order array and store it in localStorage so pagination persists
         if(!localStorage.getItem('quiz_order')){
             const order = Array.from({length:QUESTIONS.length}, (_,i)=>i);
             shuffleArray(order);
@@ -500,19 +567,15 @@ if(isset($_POST['quizFrom'])){
         }
     }
 
-    // Pagination - now 5 questions per page for 15 total questions (3 pages)
     const QUESTIONS_PER_PAGE = 5;
     let currentPage = parseInt(localStorage.getItem('quiz_page') || '0', 10);
     const totalPages = Math.ceil(QUESTIONS.length / QUESTIONS_PER_PAGE);
 
-    // Answers stored as mapping: qIndex -> selectedPoints
     let answers = JSON.parse(localStorage.getItem('quiz_answers') || '{}');
 
-    // If no order prepared yet, do it now:
     prepareQuiz();
     let quizOrder = JSON.parse(localStorage.getItem('quiz_order'));
 
-    // DOM elements
     const questionsList = document.getElementById('questionsList');
     const pageNumEl = document.getElementById('pageNum');
     const pageTotalEl = document.getElementById('pageTotal');
@@ -528,7 +591,6 @@ if(isset($_POST['quizFrom'])){
 
     pageTotalEl.textContent = totalPages;
 
-    // Check if user can submit quiz
     function checkQuizSubmission() {
         if (!canSubmitMore) {
             limitWarning.classList.remove('hidden');
@@ -541,9 +603,7 @@ if(isset($_POST['quizFrom'])){
         return true;
     }
 
-    // Render current page
     function renderPage(){
-        // Refresh global variables from localStorage (in case of restart)
         quizOrder = JSON.parse(localStorage.getItem('quiz_order') || '[]');
         answers = JSON.parse(localStorage.getItem('quiz_answers') || '{}');
 
@@ -557,7 +617,6 @@ if(isset($_POST['quizFrom'])){
         questionsList.innerHTML = '';
         pageIndexes.forEach((qIndex, idxOnPage) => {
             const q = QUESTIONS[qIndex];
-            // build question DOM
             const qWrap = document.createElement('div');
             qWrap.className = 'question';
             const qTitle = document.createElement('div');
@@ -568,13 +627,11 @@ if(isset($_POST['quizFrom'])){
             const optsDiv = document.createElement('div');
             optsDiv.className = 'options';
             q.options.forEach((opt, oi) => {
-                // Each radio name is the global qIndex, to persist selection
                 const label = document.createElement('label');
                 const input = document.createElement('input');
                 input.type = 'radio';
                 input.name = 'q'+qIndex;
                 input.value = opt.p;
-                // check if previously answered
                 if(answers['q'+qIndex] !== undefined && String(answers['q'+qIndex]) === String(opt.p)){
                     input.checked = true;
                 }
@@ -596,7 +653,6 @@ if(isset($_POST['quizFrom'])){
         prevBtn.disabled = currentPage === 0;
         nextBtn.textContent = (currentPage === totalPages - 1) ? 'Submit' : 'Next →';
         
-        // Check submission limit on last page
         if (currentPage === totalPages - 1) {
             checkQuizSubmission();
         } else {
@@ -613,7 +669,6 @@ if(isset($_POST['quizFrom'])){
         progressInfo.textContent = `${answeredCount} answered • Page ${currentPage+1}/${totalPages}`;
     }
 
-    // Navigation
     prevBtn.addEventListener('click', () => {
         if(currentPage > 0){
             currentPage--;
@@ -630,7 +685,6 @@ if(isset($_POST['quizFrom'])){
             renderPage();
             window.scrollTo({top:0,behavior:'smooth'});
         } else {
-            // Submit flow - Check if user can submit
             if (!checkQuizSubmission()) {
                 alert('You have reached your quiz submission limit. Basic package users can only submit 1 quiz.');
                 return;
@@ -639,13 +693,12 @@ if(isset($_POST['quizFrom'])){
         }
     });
 
-    // Restart quiz
     restartBtn.addEventListener('click', () => {
         if(!confirm('Restart the quiz? All progress will be cleared.')) return;
         localStorage.removeItem('quiz_answers');
         localStorage.removeItem('quiz_order');
         localStorage.removeItem('quiz_page');
-        // prepare new order and reset page
+
         prepareQuiz();
         quizOrder = JSON.parse(localStorage.getItem('quiz_order'));
         currentPage = 0;
@@ -656,27 +709,21 @@ if(isset($_POST['quizFrom'])){
     });
 
     viewResultsBtn.addEventListener('click', () => {
-        // Only allow view if quiz submitted
         if(!localStorage.getItem('quiz_submitted')){
             alert('You must submit the quiz on the last page to view the results preview.');
             return;
         }
-        // Show results preview
         showResultsPreview();
         window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
     });
 
-    // Escape HTML helper
     function escapeHtml(unsafe) {
         return unsafe.replace(/[&<"'>]/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[m]; });
     }
 
-    // ========== Scoring and submit
     function computeCategoryTotals() {
-        // Prepare totals keyed by category name
         const totals = {};
         CATEGORIES.forEach(cat => totals[cat.name] = 0);
-        // For every answered q, add points to its category
         Object.keys(answers).forEach(k => {
             if(!k.startsWith('q')) return;
             const qi = parseInt(k.slice(1), 10);
@@ -696,7 +743,6 @@ if(isset($_POST['quizFrom'])){
         }, 'google_translate_element');
     }
 
-    // Trigger Google Translate language change
     function changeLang(lang) {
         var select = document.querySelector(".goog-te-combo");
         if (select) {
@@ -708,7 +754,6 @@ if(isset($_POST['quizFrom'])){
     }
 
     function gradeForPoints(points){
-        // Adjusted for 3 questions per category (max 6 points)
         if(points <= 2) return {grade:'Bad', color:getCssVar('--bad')};
         if(points <= 4) return {grade:'Okay', color:getCssVar('--okay')};
         return {grade:'Good', color:getCssVar('--good')};
@@ -719,15 +764,12 @@ if(isset($_POST['quizFrom'])){
     }
 
     async function handleSubmit(){
-        // Check submission limit again before proceeding
         if (!canSubmitMore) {
             alert('You have reached your quiz submission limit. Basic package users can only submit 1 quiz.');
             return;
         }
 
-        // Mark as submitted (preview)
         localStorage.setItem('quiz_submitted', '1');
-        // compute totals
         const totals = computeCategoryTotals();
         const sumPoints = Object.values(totals).reduce((a,b)=>a+b, 0);
         const timeSeconds = Math.floor((Date.now() - (parseInt(localStorage.getItem('quiz_started')||Date.now()))) / 1000);
@@ -739,7 +781,6 @@ if(isset($_POST['quizFrom'])){
             submitted_at: new Date().toISOString()
         };
 
-        // Save server-side via POST
         try {
             const form = new FormData();
             form.append('payload', JSON.stringify(payload));
@@ -756,22 +797,17 @@ if(isset($_POST['quizFrom'])){
             console.warn('Server not reachable or saving failed', err);
         }
 
-        // Show thank-you message and results preview
         showThankYou(payload);
     }
 
-    // Show Thank you area + results preview
     let chartInstance = null;
     function showThankYou(payload){
-        // Hide quiz area and show thank you
         document.getElementById('quizArea').style.display = 'none';
         thankYouArea.style.display = 'block';
-        // Build chart
         setTimeout(()=>renderResultsChart(payload), 60);
     }
 
     function showResultsPreview(){
-        // For convenience show saved results in localStorage
         const totals = computeCategoryTotals();
         const payload = { totals: totals, total_points: Object.values(totals).reduce((a,b)=>a+b,0), submitted_at:new Date().toISOString() };
         document.getElementById('quizArea').style.display = 'none';
@@ -779,18 +815,15 @@ if(isset($_POST['quizFrom'])){
         renderResultsChart(payload);
     }
 
-    // Render Chart.js with background banding for grade zones
     function renderResultsChart(payload){
         const catNames = CATEGORIES.map(c => c.name);
         const dataPoints = catNames.map(n => (payload.totals && payload.totals[n] !== undefined) ? payload.totals[n] : 0);
 
-        // Offscreen canvas create (user ko nahi dikhega)
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = 800;
-        offCanvas.height = 600;
-        const ctx = offCanvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
 
-        // Chart render
         const chart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -808,52 +841,51 @@ if(isset($_POST['quizFrom'])){
                 }]
             },
             options: {
-                responsive: false, // offscreen ke liye responsive disable karo
+                responsive: false,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { min:0, max:6 } // Adjusted max to 6 (3 questions × 2 points each)
+                    y: { min:0, max:6 }
                 },
                 plugins: { legend:{ display:false } }
             }
         });
 
-        // jab render ho jaye tab image le lo
         setTimeout(() => {
-            const imgData = offCanvas.toDataURL('image/png');
-
-            fetch('email-files.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image: imgData,
-                    payload: payload
-                })
-            })
-                .then(res => res.text())
-                .then(resp => console.log("Email status:", resp))
-                .catch(err => console.error(err));
+            const imgData = canvas.toDataURL('image/png');
+            
+            saveImageToServer(imgData, payload.total_points);
         }, 500);
     }
 
-    // Set start timestamp if not set
+    async function saveImageToServer(imageData, totalPoints) {
+        try {
+            const formData = new FormData();
+            formData.append('image_data', imageData);
+            formData.append('total_points', totalPoints);
+            
+            const response = await fetch(location.href, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            if (result.ok) {
+                console.log('Image saved successfully:', result.image_path);
+            } else {
+                console.error('Failed to save image:', result.error);
+            }
+        } catch (error) {
+            console.error('Error saving image:', error);
+        }
+    }
+
     if(!localStorage.getItem('quiz_started')) localStorage.setItem('quiz_started', Date.now());
 
-    // On initial load render page
     renderPage();
     checkQuizSubmission();
 
-    // Ensure quiz_order exists; if not (e.g. after restart) prepare
-    // (prepareQuiz called earlier, but ensure again)
     if(!localStorage.getItem('quiz_order')) prepareQuiz();
 
 </script>
 </body>
 </html>
-<?php
-} else {
-	$_SESSION['toastr_message'] = "Please Login First!";
-	$_SESSION['toastr_type'] = "info";
-	header("Location: login.php");
-	exit();
-}
-?>

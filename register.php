@@ -137,8 +137,8 @@
         $currentDateTime = date("Y-m-d H:i:s");
         $expiryDate = calculateExpiryDate($type);
 
-        $query = "INSERT INTO `users`( u_hashcode, u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_submitted) 
-        VALUES ('{$_SESSION['hashcode']}','{$_SESSION['name']}','{$_SESSION['email']}','{$_SESSION['password']}','$type','$currentDateTime','$expiryDate','0','Landlord','1','0')";
+        $query = "INSERT INTO `users`(u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_submitted) 
+        VALUES ('{$_SESSION['name']}','{$_SESSION['email']}','{$_SESSION['password']}','$type','$currentDateTime','$expiryDate','0','Landlord','1','0')";
 
         mysqli_query($con, $query) or die(mysqli_error($con));
         $userId = $con->insert_id;
@@ -175,8 +175,8 @@
             $currentDateTime = date("Y-m-d H:i:s");
             $expiryDate = calculateExpiryDate($type);
 
-            $query = "INSERT INTO `users`( u_hashcode, u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_submitted) 
-            VALUES ('{$_SESSION['hashcode']}','{$_SESSION['name']}','{$_SESSION['email']}','{$_SESSION['password']}','$type','$currentDateTime','$expiryDate','0','Landlord','1','0')";
+            $query = "INSERT INTO `users`(u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_created) 
+            VALUES ('{$_SESSION['name']}','{$_SESSION['email']}','{$_SESSION['password']}','$type','$currentDateTime','$expiryDate','0','Landlord','1','0')";
 
             mysqli_query($con, $query) or die(mysqli_error($con));
             $userId = $con->insert_id;
@@ -282,10 +282,10 @@
                             <label>Select Package</label>
                             <div class="pass-group">
                                 <select name="package_type" required>
-                                    <option value="Basic">Basic - $30 [Validity: ]</option>
-                                    <option value="Silver">Silver - $5,000 [Validity: ]</option>
-                                    <option value="Gold">Gold - $10,000 [Validity: ]</option>
-                                    <option value="Platinum">Platinum - $20,000 [Validity: ]</option>
+                                    <option value="Basic">Basic - $30 [Validity: 1 Day]</option>
+                                    <option value="Silver">Silver - $5,000 [Validity: 3 months]</option>
+                                    <option value="Gold">Gold - $10,000 [Validity: 6 months]</option>
+                                    <option value="Platinum">Platinum - $20,000 [Validity: 9 months]</option>
                                 </select>
                             </div>
                         </div>
@@ -299,12 +299,12 @@
                                         PayPal
                                     </label>
                                 </div>
-                                <div class="payment-option">
+                                <!-- <div class="payment-option">
                                     <input type="radio" id="stripe" name="payment_method" value="stripe" required>
                                     <label for="stripe">
                                         Credit/Debit Card (Stripe)
                                     </label>
-                                </div>
+                                </div> -->
                             </div>
                         </div>
 
