@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 04, 2025 at 05:21 AM
+-- Generation Time: Oct 04, 2025 at 07:13 PM
 -- Server version: 10.4.19-MariaDB
 -- PHP Version: 7.3.28
 
@@ -67,7 +67,7 @@ CREATE TABLE `quizzes` (
 --
 
 INSERT INTO `quizzes` (`q_id`, `q_user_id`, `q_name`, `q_email`, `q_phone`, `q_code`, `q_result`, `q_image`) VALUES
-(19, 19, NULL, NULL, NULL, '5f5d1431', NULL, NULL);
+(20, 19, 'Arbaz Ali', 'arbu1499@gmail.com', '03201235249', 'ce6262e0', '23', 'quiz_result_1759597354.png');
 
 -- --------------------------------------------------------
 
@@ -96,7 +96,7 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`u_id`, `u_name`, `u_email`, `u_password`, `u_profile_img`, `u_package_type`, `u_registered_at`, `u_expired_at`, `u_is_expired`, `u_role`, `u_status`, `u_quiz_created`) VALUES
 (17, 'Admin', 'admin@domain.com', '@dmin', '', 'Admin', '2025-10-03 14:05:53', '2025-10-03 14:05:53', '0', 'Admin', '1', 0),
-(19, 'Arbaz Ali', 'arbu1499@gmail.com', '1234', NULL, 'Gold', '2025-10-04 08:14:27', '2025-10-05 08:14:27', '0', 'Landlord', '1', 1);
+(19, 'Arbaz Ali', 'arbu1499@gmail.com', '1234', NULL, 'Gold', '2025-10-04 08:14:27', '2025-10-05 08:14:27', '0', 'Landlord', '1', 5);
 
 --
 -- Indexes for dumped tables
@@ -136,7 +136,7 @@ ALTER TABLE `payments`
 -- AUTO_INCREMENT for table `quizzes`
 --
 ALTER TABLE `quizzes`
-  MODIFY `q_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `q_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `users`

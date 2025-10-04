@@ -55,7 +55,7 @@
                                                 <?= $url.'quiz.php?code='.$fetchQuizes['q_code'] ?>
                                             </a></td>
                                             <td><?= $fetchQuizes['q_result'] ?></td>
-                                            <td></td>
+                                            <td><img src="results/<?= $fetchQuizes['q_image'] ?>"></td>
                                             <td>
                                                 Name: <?= $fetchQuizes['q_name'] ?>
                                                 <br>Email: <?= $fetchQuizes['q_email'] ?>

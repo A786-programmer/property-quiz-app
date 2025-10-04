@@ -1,37 +1,31 @@
 <?php
-include 'config.php';
-include 'email-files.php';
-
-if(isset($_GET['code'])) {
+    include 'config.php';
+    include 'email-files.php';
     $quizCode = mysqli_real_escape_string($con, $_GET['code']);
-    
-    $quizQuery = mysqli_query($con, "SELECT * FROM quizzes WHERE q_code='$quizCode'");
-    
-    if(mysqli_num_rows($quizQuery) > 0) {
-        $quizData = mysqli_fetch_assoc($quizQuery);
-        $QuizUserId = $quizData['q_user_id'];
-        $quizId = $quizData['q_id']; 
-
-        $_SESSION['quiz_access'] = true;
-        $_SESSION['QuizUserId'] = $QuizUserId;
-        $_SESSION['quiz_code'] = $quizCode;
-        $_SESSION['quiz_id'] = $quizId; 
-        
-        $userQuery = mysqli_query($con, "SELECT u_package_type, u_quiz_created FROM users WHERE u_id = '$QuizUserId'");
-        $userData = mysqli_fetch_assoc($userQuery);
-        $userType = $userData['u_package_type'];
-        $quizSubmittedCount = $userData['u_quiz_created'];
-        
-        $_SESSION['qa_user'] = $QuizUserId;
-        $_SESSION['userType'] = $userType;
-        $_SESSION['quizSubmittedCount'] = $quizSubmittedCount;
-        
-    } else {
-        die("Invalid quiz link! This quiz does not exist.");
+    $quiz = mysqli_query($con, "SELECT * FROM quizzes WHERE q_code='$quizCode'");
+    if (mysqli_num_rows($quiz) == 0) {
+        die("Invalid quiz Link");
     }
-} else {
-    die("No quiz code provided! Please use a valid quiz link.");
-}
+    $quizData = mysqli_fetch_assoc($quiz);
+    if ($quizData['q_name'] && $quizData['q_email'] && $quizData['q_phone']) {
+        die("Quiz Already Submitted using this Link");
+    }
+    $QuizUserId = $quizData['q_user_id'];
+    $quizId = $quizData['q_id']; 
+
+    $_SESSION['quiz_access'] = true;
+    $_SESSION['QuizUserId'] = $QuizUserId;
+    $_SESSION['quiz_code'] = $quizCode;
+    $_SESSION['quiz_id'] = $quizId; 
+    
+    $userQuery = mysqli_query($con, "SELECT u_package_type, u_quiz_created FROM users WHERE u_id = '$QuizUserId'");
+    $userData = mysqli_fetch_assoc($userQuery);
+    $userType = $userData['u_package_type'];
+    $quizSubmittedCount = $userData['u_quiz_created'];
+    
+    $_SESSION['qa_user'] = $QuizUserId;
+    $_SESSION['userType'] = $userType;
+    $_SESSION['quizSubmittedCount'] = $quizSubmittedCount;
 
 function canSubmitQuiz($userType, $quizSubmittedCount) {
     if ($userType == 'basic') {
