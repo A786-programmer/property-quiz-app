@@ -136,17 +136,16 @@
         $payer_name = $_GET['first_name'] . ' ' . $_GET['last_name'];
         $currentDateTime = date("Y-m-d H:i:s");
         $expiryDate = calculateExpiryDate($type);
-
-        $query = "INSERT INTO `users`(u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_submitted) 
+      
+        $query = "INSERT INTO `users`(u_name, u_email, u_password, u_package_type, u_registered_at, u_expired_at, u_is_expired, u_role, u_status, u_quiz_created) 
         VALUES ('{$_SESSION['name']}','{$_SESSION['email']}','{$_SESSION['password']}','$type','$currentDateTime','$expiryDate','0','Landlord','1','0')";
-
         mysqli_query($con, $query) or die(mysqli_error($con));
         $userId = $con->insert_id;
 
         $_SESSION['qa_user'] = $userId;
 
-        mysqli_query($con, "INSERT INTO `payments`(p_payment, p_transaction_id, p_channel, p_payer_email, p_payer_name, p_table, p_table_id, p_user_id, p_paid_at)
-        VALUES ('$amount','$transaction_id','PAYPAL','$payer_email','$payer_name','Basic','$userId','$userId','$currentDateTime')");
+        mysqli_query($con, "INSERT INTO `payments`(p_payment, p_transaction_id, p_channel, p_payer_email, p_payer_name, p_user_id, p_paid_at)
+        VALUES ('$amount','$transaction_id','PAYPAL','$payer_email','$payer_name','$userId','$currentDateTime')");
 
         $_SESSION['toastr_message'] = "Payment Successful! Welcome, {$_SESSION['name']}! Your package expires on " . date('d M, Y h:i A', strtotime($expiryDate));
         $_SESSION['toastr_type'] = "success";
@@ -154,7 +153,7 @@
         // Clear session data
         unset($_SESSION['password'], $_SESSION['email'], $_SESSION['package_type'], $_SESSION['payment_method'], $_SESSION['name'], $_SESSION['phone']);
 
-        header("Location: settings.php");
+        header("Location: index.php");
         exit();
     }
 
@@ -192,7 +191,7 @@
             // Clear session data
             unset($_SESSION['password'], $_SESSION['email'], $_SESSION['package_type'], $_SESSION['payment_method'], $_SESSION['name'], $_SESSION['phone']);
 
-            header("Location: settings.php");
+            header("Location: index.php");
             exit();
 
         } catch (Exception $e) {

@@ -7,53 +7,20 @@ switch($type){
         session_destroy();
         echo '<script>window.location="login.php";</script>';
     break;
-    case 'deleteUser':
-        $userId = $_GET['userId'];
-        try {
-            mysqli_query($con,"DELETE FROM `users` WHERE u_id='$userId'");
-            $_SESSION['toastr_message'] = "User Has been Deleted Successfully!";
-            $_SESSION['toastr_type'] = "success";
-            header("Location: users.php");
-            exit();
-        } catch (Exception $e) {
-            $_SESSION['toastr_message'] = "Something went wrong: " . $e->getMessage();
-            $_SESSION['toastr_type'] = "error";
-            header("Location: users.php");
-            exit();
-        }
-    break;
-    case 'deactivateUser':
-        $userId = $_GET['userId'];
-        try {
-            mysqli_query($con,"UPDATE `users` SET u_status = '0' WHERE u_id='$userId'");
-            $_SESSION['toastr_message'] = "User Has been Deactived Successfully!";
-            $_SESSION['toastr_type'] = "success";
-            header("Location: users.php");
-            exit();
-        } catch (Exception $e) {
-            $_SESSION['toastr_message'] = "Something went wrong: " . $e->getMessage();
-            $_SESSION['toastr_type'] = "error";
-            header("Location: users.php");
-            exit();
-        }
-    break;
-    case 'activateUser':
-        $userId = $_GET['userId'];
-        try {
-            mysqli_query($con,"UPDATE `users` SET u_status = '1' WHERE u_id='$userId'");
-            $_SESSION['toastr_message'] = "User Has been Activated Successfully!";
-            $_SESSION['toastr_type'] = "success";
-            header("Location: users.php");
-            exit();
-        } catch (Exception $e) {
-            $_SESSION['toastr_message'] = "Something went wrong: " . $e->getMessage();
-            $_SESSION['toastr_type'] = "error";
-            header("Location: users.php");
-            exit();
-        }
+    case 'createLink':
+        $randomCode = substr(md5(time() . rand()), 0, 8);
+        $user = mysqli_query($con, "SELECT u_quiz_created FROM `users` WHERE u_id='$_SESSION[qa_user]'");
+        $fetchUser = mysqli_fetch_assoc($user);
+        $quizCreated = $fetchUser['u_quiz_created'] + 1;
+        mysqli_query($con, "UPDATE users SET u_quiz_created='$quizCreated' WHERE u_id='$_SESSION[qa_user]'");
+        mysqli_query($con, "INSERT INTO quizzes (q_user_id, q_code) VALUES ('$_SESSION[qa_user]', '$randomCode')");
+        $_SESSION['toastr_message'] = "Quiz Link Generated Successfully!";
+        $_SESSION['toastr_type'] = "success";
+        header("Location: index.php");
     break;
     default:
         echo '<script>alert("Invalid Access");
         window.location="settings.php";</script>';
+    break;
 }
 ?>
