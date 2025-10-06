@@ -480,9 +480,11 @@
                 setTimeout(()=>renderResultsChart(payload), 60);
             }
 
-            function renderResultsChart(payload){
+            function renderResultsChart(payload) {
                 const catNames = CATEGORIES.map(c => c.name);
                 const dataPoints = catNames.map(n => (payload.totals && payload.totals[n] !== undefined) ? payload.totals[n] : 0);
+
+                const scaledDataPoints = dataPoints.map(score => Math.round((score / 6) * 20));
 
                 const canvas = document.createElement('canvas');
                 canvas.width = 800;
@@ -494,12 +496,12 @@
                     data: {
                         labels: catNames,
                         datasets: [{
-                            label: 'Points (0–6)',
-                            data: dataPoints,
-                            backgroundColor: catNames.map(n => {
-                                const pts = payload.totals[n] || 0;
-                                const g = gradeForPoints(pts);
-                                return g.color.trim();
+                            label: 'Score (0-20)',
+                            data: scaledDataPoints,
+                            backgroundColor: scaledDataPoints.map(score => {
+                                if (score >= 15) return '#16a34a';
+                                if (score >= 9) return '#f59e0b';
+                                return '#ef4444';
                             }),
                             borderRadius: 6,
                             barThickness: 36
@@ -509,15 +511,79 @@
                         responsive: false,
                         maintainAspectRatio: false,
                         scales: {
-                            y: { min:0, max:6 }
+                            y: { 
+                                min: 0, 
+                                max: 20,
+                                ticks: {
+                                    stepSize: 2,
+                                    callback: function(value) {
+                                        // Add the category labels on y-axis like in your image
+                                        if (value === 20) return '20 - Good';
+                                        if (value === 14) return '14 - Okay';
+                                        if (value === 6) return '6 - Bad';
+                                        return value;
+                                    },
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(0,0,0,0.1)'
+                                },
+                                title: {
+                                    display: true,
+                                    font: {
+                                        size: 16,
+                                        weight: 'bold'
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    autoSkip: false,
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
                         },
-                        plugins: { legend:{ display:false } }
+                        plugins: { 
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: 'Category-wise Results Preview',
+                                font: {
+                                    size: 18,
+                                    weight: 'bold'
+                                },
+                                padding: 20
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const score = context.parsed.y;
+                                        let category = '';
+                                        if (score >= 15) category = ' - Good';
+                                        else if (score >= 9) category = ' - Okay';
+                                        else category = ' - Bad';
+                                        return `Score: ${score}${category}`;
+                                    }
+                                }
+                            }
+                        }
                     }
                 });
 
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
                 setTimeout(() => {
                     const imgData = canvas.toDataURL('image/png');
-                    
                     saveImageToServer(imgData, payload.total_points);
                 }, 500);
             }

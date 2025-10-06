@@ -2,11 +2,15 @@
     include 'config.php';
     if (isset($_SESSION['qa_user'])) {
         $indexActive = 'active';
+        $quizLeft = 'Unlimited';
+        if ($fetchUser['u_package_type'] == 'Basic') {
+            $quizLeft = 1-$fetchUser['u_quiz_created'];
+        }
 ?>
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>Users - Quiz List</title>
+        <title>Home | <?= $websiteName ?></title>
         <?php include 'header-files.php' ?>
         <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
     </head>
@@ -18,59 +22,62 @@
                 <div class="content">
                     <div class="page-header">
                         <div class="page-title">
-                            <h4>Quiz List</h4>
+                            <h4>Quizes</h4>
                         </div>
                     </div>
-                    <?php 
-                        if ($fetchUser['u_package_type'] == 'Basic' &&  $fetchUser['u_quiz_created'] > 0 ) {
-                            echo '<h6>You can Only Generate 1 Quiz</h6>';
-                        } else {
-                    ?>
-                    <a href="code.php?type=createLink" class="btn btn-submit me-2 mb-3">Generate Link</a>
-                    <?php
-                        }
-                    ?>
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table datanew">
-                                    <thead>
-                                        <tr>
-                                            <th>S. No</th>
-                                            <th>Link</th>
-                                            <th>Result</th>
-                                            <th>Graph</th>
-                                            <th>Attempted By</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php 
-                                            $sno = 1;
-                                            $quizes = mysqli_query($con,"SELECT * FROM `quizzes` WHERE q_user_id='$_SESSION[qa_user]'");
-                                            while ($fetchQuizes = mysqli_fetch_assoc($quizes)) {
-                                        ?>
-                                        <tr>
-                                            <td><?= $sno; ?></td>
-                                            <td><a target="_blank" href="<?= $url.'quiz.php?code='.$fetchQuizes['q_code'] ?>">
-                                                <?= $url.'quiz.php?code='.$fetchQuizes['q_code'] ?>
-                                            </a></td>
-                                            <td><?= $fetchQuizes['q_result'] ?></td>
-                                            <td><img src="results/<?= $fetchQuizes['q_image'] ?>"></td>
-                                            <td>
-                                                Name: <?= $fetchQuizes['q_name'] ?>
-                                                <br>Email: <?= $fetchQuizes['q_email'] ?>
-                                                <br>Phone: <?= $fetchQuizes['q_phone'] ?>
-                                            </td>
-                                        </tr>
-                                        <?php
-                                                $sno++;
-                                            }
-                                        ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <div class="row">
+						<div class="col-lg-3 col-sm-6 col-12 d-flex">
+							<div class="dash-count das2">
+								<div class="dash-counts">
+									<h4><?= $fetchUser['u_quiz_created'] ?></h4>
+									<h5>Quiz Created</h5>
+								</div>
+								<div class="dash-imgs">
+									<i data-feather="file-text"></i>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-sm-6 col-12 d-flex">
+							<div class="dash-count das3">
+								<div class="dash-counts">
+									<h4><?= $quizLeft ?></h4>
+									<h5>Remaining Quizes</h5>
+								</div>
+								<div class="dash-imgs">
+									<i data-feather="file"></i>  
+								</div>
+							</div>
+						</div>
+                    </div>
+                    <div class="page-header">
+                        <div class="page-title">
+                            <h4>Membership</h4>
                         </div>
                     </div>
+                    <div class="row">
+						<div class="col-md-4">
+							<div class="dash-count">
+								<div class="dash-counts">
+									<h4><?= $fetchUser['u_package_type'] ?></h4>
+									<h5>Package Type</h5>
+								</div>
+								<div class="dash-imgs">
+									<i data-feather="user"></i> 
+								</div>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="dash-count das1">
+								<div class="dash-counts">
+									<h4><?= $fetchUser['u_registered_at'] ?></h4>
+									<h5>Member Since</h5>
+								</div>
+								<div class="dash-imgs">
+									<i data-feather="user-check"></i> 
+								</div>
+							</div>
+						</div>
+					</div>
                 </div>
             </div>
         </div>

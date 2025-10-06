@@ -28,7 +28,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>Settings</title>
+		<title>Settings | <?= $websiteName ?></title>
         <?php include 'header-files.php' ?>
 	</head>
 	<body>

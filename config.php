@@ -7,7 +7,7 @@
     date_default_timezone_set('Asia/Karachi');
     // date_default_timezone_set("Canada/Central");
     error_reporting(0);
-    $websiteName = 'Quiz App';
+    $websiteName = 'Choice Tenant';
 
     $user = mysqli_query($con,"SELECT * FROM users WHERE u_id = '$_SESSION[qa_user]'");
     $fetchUser = mysqli_fetch_array($user);
